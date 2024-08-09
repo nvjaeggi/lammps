@@ -1,0 +1,44 @@
+
+# try1: successfully inserts one helium atom into a vacancy in a tungsten lattice
+# reads data from Vesta
+
+variable radius equal 4
+variable T equal 300
+
+
+units metal
+dimension 3
+atom_style atomic
+boundary p p p
+
+read_data ../init/lattice2.data
+# W = 1, He = 2
+
+# https://openkim.org/id/EAM_Dynamo_BonnyGrigorevTerentyev_2014EAM1_WHHe__MO_292520929154_000#files
+pair_style eam/alloy
+pair_coeff * * ../potentials/potential-WHHe-EAM1.eam.alloy W He
+
+# find center of mass
+group tungsten_atoms type 1
+variable xcm equal xcm(tungsten_atoms,x)
+variable ycm equal xcm(tungsten_atoms,y)
+variable zcm equal xcm(tungsten_atoms,z)
+print "center of mass: ${xcm} ${ycm} ${zcm}"
+# delete a center bubble
+region bubble sphere ${xcm} ${ycm} ${zcm} ${radius}
+group tungsten_bubble region bubble
+delete_atoms group tungsten_bubble
+# create 1 helium atom inside the bubble (at COM)
+create_atoms 2 single ${xcm} ${ycm} ${zcm} 
+group helium_atom type 2
+
+# fixes
+velocity all create ${T} 425521 mom yes rot yes dist gaussian
+fix mynvt all nvt temp ${T} ${T} 0.1
+# fix mynve all nve
+fix myrc all recenter INIT INIT INIT
+timestep 0.001
+
+dump dmp all atom 10 dump1.lammpstrj
+thermo 100
+run 500

@@ -1,0 +1,99 @@
+# This LAMMPS input file continuously shoots Helium atoms
+# into the middle of a forsterite block :O
+
+# temperature in Kelvin
+variable T equal 273
+# random seed
+variable seed equal 12345
+
+variable n equal 500 # in incident atoms
+variable dt equal 0.0005 # in picoseconds
+variable m equal 7.0/${dt} # in timesteps
+# needed for thermostat, represents how many timesteps pass between temperature adjustments
+# higher damping factor means less temperature adjustment
+variable damping equal 10*${dt} 
+variable runtime equal ${n}*${m} # in timesteps
+
+variable run string try30
+
+# 5.0/0.0005 = 10,000 steps per atom
+# 10,000 steps * 100 atoms = 1,000,000 steps total
+
+
+
+# 1) Initialization
+units metal
+dimension 3
+# periodic in the x,y directions, fixed in the z-direction
+boundary p p f
+atom_style charge # atomic + q
+
+
+
+# 2) System definition
+read_data ../atoms/cube/forsterite_surface.data
+
+# x is (-inf, inf), y is (-inf, inf), z is (-inf, 10)
+# INF in first pair spot represents negative
+region fixed_layer block INF INF INF INF INF 10
+region thermo_layer block INF INF INF INF 10 35
+# side in(clusive) is required for use with fix deposit
+region spawn_He block 5 70 5 70 92 95 side in
+
+group forsterite_atoms type 1 2 3
+group He_bombs type 4
+group fixed_atoms region fixed_layer
+# necessary to subtract He_bombs to prevent double time integration
+group unfixed_atoms subtract all fixed_atoms He_bombs
+group thermo_atoms region thermo_layer
+
+
+
+# 3) Simulation settings
+mass 1 24.305   # Mg
+mass 2 28.0855  # Si
+mass 3 15.9994  # O
+mass 4 4.0026   # He
+# set type 4 charge 1.0
+
+include ../new-potentials/pedone-fittedLJ.param
+
+
+
+# 4) Visualization
+dump dmp all atom 1000 dump_${run}.lammpstrj
+
+
+
+# 5) Run
+# velocity calculations from
+# https://www.ericnhahn.com/tutorials/lammps-tutorials/pka
+variable eV equal 30
+variable J equal ${eV}*1.602*10^-19
+variable mass_amu equal 4.0026 
+variable mass_kg equal ${mass_amu}*1.66*10^-27
+variable velocity_ms equal (2*${J}/${mass_kg})^0.5
+variable velocity equal -1*${velocity_ms}/100 
+
+# time integrates (NVE) all atoms except the fixed layer at the bottom
+fix my_nve unfixed_atoms nve
+fix he_nve He_bombs nve
+# Langevin thermostat on the thermo layer
+# normal damping factor is 100dt, but that was too high for me
+fix mylang thermo_atoms langevin ${T} ${T} ${damping} ${seed} zero yes
+# fix deposit creates a new type 4 (Helium) atom every m timesteps until it has created n atoms
+# they are created in the spawn_He region and cannot be nearer than 0.5 to any other particle
+# they are created with a specified velocity in the z-direction and are added to the He_bombs group
+fix mydeposit He_bombs deposit ${n} 4 ${m} ${seed} region spawn_He near 0.5 vz ${velocity} ${velocity}
+
+
+variable numHe equal count(He_bombs)
+thermo_style custom step time atoms temp press v_numHe
+thermo_modify lost warn # ignore lost atoms
+thermo 10000
+
+
+timestep ${dt}
+run ${runtime}
+
+write_data forsterite_bombed_${run}.data

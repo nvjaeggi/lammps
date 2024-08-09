@@ -1,0 +1,46 @@
+# This LAMMPS input file deletes an upper section of the forsterite block to 
+# expose a new surface. Then, it brings the relaxed forsterite block to equilibrium in the
+# NVT ensemble, bringing the pressure to a stable value. Equilibration can be measured
+# using root mean squared deviation (RMSD).
+
+variable T equal 273
+variable dt equal 0.002
+variable damping equal dt*50
+variable seed equal 12345
+variable runtime equal 50000 # 50k steps
+variable init_pressure equal ???
+variable run_name string deep-cube
+
+
+# 1) Initialization
+units metal
+dimension 3
+boundary p p p
+atom_style charge # atomic + q
+
+
+# 2) System definition
+read_data atoms/${run_name}/forsterite_equilibrated_NVT.data # includes mass and charge atomic data
+
+
+# 3) Simulation settings
+include pedone.param
+
+
+# 4) Visualization
+dump dmp all atom 500 dump5.lammpstrj
+
+# msd returns vector of squared dx, dy, and dz displacements and total squared displacement
+compute mymsd all msd com yes
+thermo_style custom step time temp press vol pe ke density c_mymsd[1] c_mymsd[2] c_mymsd[3] c_mymsd[4] 
+thermo 100
+
+
+# 5) Run
+fix myfix all npt temp ${T} ${T} ${damping} iso ${init_pressure} ${init_pressure} ${damping}
+
+timestep ${dt}
+neigh_modify delay 5 every 1 check yes
+run ${runtime}
+
+write_data atoms/${run_name}/forsterite_equilibrated_NPT.data

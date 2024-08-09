@@ -1,0 +1,64 @@
+# This LAMMPS input file extends the simulation box in the z-direction and
+# waits for equilibration. 
+
+variable T equal 273
+
+variable seed equal 12345
+
+variable runtime equal 50000 # 50k steps
+variable dt equal 0.0002 # in picoseconds
+variable damping equal 5*${dt}
+variable run_name string deep-cube
+
+
+
+# 1) Initialization
+units metal
+dimension 3
+boundary p p f
+atom_style charge # atomic + q
+
+
+
+# 2) System definition
+read_data atoms/${run_name}/forsterite_equilibrated_NPT.data
+
+change_box all z final 0 900
+region fixed_layer block INF INF INF INF INF 40
+region thermo_layer block INF INF INF INF 40 140
+group fixed_atoms region fixed_layer
+group unfixed_atoms subtract all fixed_atoms
+group thermo_atoms region thermo_layer
+
+
+
+# 3) Simulation settings
+mass 1 24.305   # Mg
+mass 2 28.0855  # Si
+mass 3 15.9994  # O
+
+include potentials/pedone-only.param
+
+
+
+# 4) Visualization
+dump dmp all atom 1000 dump_${run_name}5.lammpstrj
+
+
+
+# 5) Run
+# fixes (Langevin thermostat)
+fix mynve unfixed_atoms nve
+# fix myfreeze fixed_atoms setforce 0.0 0.0 0.0
+fix mylang thermo_atoms langevin ${T} ${T} ${damping} ${seed} zero yes
+
+compute mymsd all msd com yes
+thermo_style custom step time atoms temp press density pe ke vol c_mymsd[1] c_mymsd[2] c_mymsd[3] c_mymsd[4] 
+thermo_modify lost warn # ignore lost atoms
+thermo 1000
+
+
+timestep ${dt}
+run ${runtime}
+
+write_data atoms/${run_name}/forsterite_surface.data

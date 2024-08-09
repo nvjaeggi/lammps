@@ -1,0 +1,96 @@
+# This LAMMPS input file continuously bombards a forsterite block with Helium atoms
+# using fix deposit.
+
+variable T equal 273
+variable seed equal 12345
+
+variable n equal 400 # in incident atoms
+variable dt equal 0.0002 # in picoseconds
+variable m equal 2.0/${dt} # in timesteps
+variable damping equal 5*${dt}
+variable runtime equal ${n}*${m}
+
+# 2.0/0.0002 = 10,000 steps per atom
+# 10,000 steps * 400 atoms = 4,000,000 steps total
+
+
+
+# 1) Initialization
+units metal
+dimension 3
+boundary p p f
+atom_style charge # atomic + q
+
+
+
+# 2) System definition
+read_data atoms/cube/forsterite_bombed2.data
+
+region fixed_layer block INF INF INF INF INF 10
+region thermo_layer block INF INF INF INF 10 35
+region spawn_He block 5 70 5 70 110 115 side in
+group fixed_atoms region fixed_layer
+group unfixed_atoms subtract all fixed_atoms
+group thermo_atoms region thermo_layer
+group forsterite_atoms type 1 2 3
+group He_bombs type 4
+
+
+
+# 3) Simulation settings
+mass 1 24.305   # Mg
+mass 2 28.0855  # Si
+mass 3 15.9994  # O
+mass 4 4.0026   # He
+set type 4 charge 1.0
+
+include potentials/pedone-wrong.param
+
+
+
+# 4) Visualization
+dump dmp1 all atom 1000 dump_try7.lammpstrj
+
+# potential and kinetic energy per atom
+compute pot all pe/atom
+compute ket all ke/atom
+dump dmp2 all custom 10000 pot-energy_try7.txt id type c_pot c_ket
+
+# stress / pressure and voronoi volume
+compute stress He_bombs stress/atom NULL
+compute voronoi He_bombs voronoi/atom
+dump dmp3 He_bombs custom 10000 stress-volume_try7.txt id type c_voronoi[1] c_stress[1] c_stress[2] c_stress[3]
+
+
+
+# 5) Run
+# fixes (Langevin thermostat)
+fix mynve unfixed_atoms nve
+fix nveHe He_bombs nve
+# fix myfreeze fixed_atoms setforce 0.0 0.0 0.0
+fix mylang thermo_atoms langevin ${T} ${T} ${damping} ${seed} zero yes
+
+# velocity calculations referencing
+# https://www.ericnhahn.com/tutorials/lammps-tutorials/pka
+variable eV equal 60
+variable J equal ${eV}*1.602*10^-19
+variable mass_amu equal 4.0026 
+variable mass_kg equal ${mass_amu}*1.66*10^-27
+variable velocity_ms equal (2*${J}/${mass_kg})^0.5
+variable velocity equal -1*${velocity_ms}/100 # now in angstrom/picosecond
+
+# create the bombarding Helium atom 
+fix mydeposit He_bombs deposit ${n} 4 ${m} ${seed} region spawn_He near 1.0 vz ${velocity} ${velocity}
+
+
+variable numHe equal count(He_bombs)
+thermo_style custom step time atoms temp press v_numHe
+thermo_modify lost warn # ignore lost atoms
+thermo 10000
+
+
+# restart 100000 checkpoints/save_bomb_cube.%
+timestep ${dt}
+run ${runtime}
+
+write_data atoms/cube/forsterite_bombed_try7.data

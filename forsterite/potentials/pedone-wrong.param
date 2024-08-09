@@ -1,0 +1,28 @@
+# Mg-Si-O is pedone and coul/dsf, He-He is beck, (Mg/Si/O)-He is lennard-jones
+pair_style hybrid/overlay pedone 15.0 coul/dsf 0.05 15.0 beck 8.0 lj/cut 2.0
+# kspace_style pppm 1.0e-6 # ewald summation for long-range Coulombic interactions, worked with coul/long
+
+pair_coeff *3 *3 coul/dsf 
+pair_coeff 2 3 pedone 0.443427 1.758024 2.081625 1.0    # Si-O
+pair_coeff 1 3 pedone 0.123583 2.045583 2.424824 5.0    # Mg-O
+pair_coeff 3 3 pedone 0.042323 1.311417 3.762599 22.0   # O-O
+
+# Beck (1968)
+# pair_coeff * * A B a alpha beta
+# https://www.tandfonline.com/doi/epdf/10.1080/00268976800100381?needAccess=true
+pair_coeff 4 4 beck 398.7 0.869 0.675 4.390 3.746E-6
+
+# Lennard-Jones 
+# pair_coeff * * epsilon (energy units) sigma (distance units) LJ cutoff (distance units)
+# https://mattermodeling.stackexchange.com/questions/4845/how-to-create-a-lookup-table-of-%CF%B5-and-%CF%83-values-for-lennard-jones-potentials
+pair_coeff 4 1 lj/cut 0.008604016 5.0 10.0493000            # He-Mg
+pair_coeff 4 2 lj/cut 0.054685624 5.0 10.0493000             # He-Si
+pair_coeff 4 3 lj/cut 0.069495665 5.0 10.0493000             # He-O
+
+
+
+
+# Mg is type 1
+# Si is type 2
+# O is type 3 
+# He is type 4

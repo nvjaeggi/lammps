@@ -1,0 +1,48 @@
+# This LAMMPS input file relaxes a block of forsterite (Mg2SiO4).
+# It minimizes the potential energy of the initial configuration at 0 Kelvin.
+
+variable run_name string deep-cube
+
+# 1) Initialization
+units metal
+dimension 3
+boundary p p p
+atom_style charge # atomic + q
+
+
+# 2) System definition
+read_data atoms/Mg2SiO4.unitcell.data
+
+# atoms/deep-cube
+replicate 42 33 80
+# for atoms/cube:
+# replicate 16 13 8
+# for atoms/test:
+# replicate 2 1 1
+
+mass 1 24.305   # Mg
+mass 2 28.0855  # Si
+mass 3 15.9994  # O
+
+set type 1 charge 1.2   # Mg +2 
+set type 2 charge 2.4   # Si +4
+set type 3 charge -1.2  # O  -2
+
+
+# 3) Simulation settings
+include potentials/pedone.param
+
+
+# 4) Visualization
+dump dmp all atom 500 ${run_name}1.lammpstrj
+
+
+# 5) Run
+thermo_style custom step time lx ly lz pe press temp vol
+thermo 100
+
+fix myfix all box/relax iso 0.0 # matches system pressure to external pressure
+timestep 0.002
+minimize 0.0 0.0 10000 10000
+
+write_data atoms/${run_name}/forsterite_relaxed.data

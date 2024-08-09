@@ -1,0 +1,123 @@
+# This LAMMPS input file loops n times. In each loop, it creates a Helium atom with a negative z-velocity
+# at 60eV to collide with a Tungsten lattice, measures implantation depth or reflection, and then resets the simulation.
+# Simulation parameters are copied from Sandoval et al. (2015)
+
+variable a equal 3.183
+variable T equal 1000
+
+variable n equal 1000
+variable seedX index ${n}
+variable seedY index ${n}
+variable chunk index 4
+# variable seedX equal 20099
+# variable seedY equal 22310
+variable startX equal random(5,15,${seedX})
+variable startY equal random(5,15,${seedY})
+
+variable dt equal 0.0002
+variable damping equal 10*${dt}
+variable runtime equal 5000
+# total runtime should be slightly more than 1 ps
+
+############ Begin Loop ############
+variable i loop ${n}
+label loop
+clear
+
+# print "run ${i}: ${seedX}"
+# print "run ${i}: ${seedY}"
+
+# 1) Initialization
+units metal
+dimension 3
+boundary p p m
+atom_style charge # atomic + q
+
+
+
+# 2) System definition
+lattice bcc ${a}
+region cube block 0 20 0 20.5 0 20 units lattice
+create_box 2 cube
+
+# needs to create 16,399 W atoms => creates 16,400...close enough
+create_atoms 1 box # place atoms on lattice
+change_box all z final 0 25 units lattice
+region bottom_4a block 0 20 0 20.5 INF 4 units lattice
+group bottom_4a region bottom_4a
+group W_atoms type 1
+
+
+
+# 3) Simulation settings
+mass 1 183.84  # W
+mass 2 4.0026  # He
+
+# W-He is table, W-W is eam/fs, He-He is beck
+pair_style hybrid table linear 325 eam/fs beck 8.0
+
+# Juslin-Wirth (2013)
+pair_coeff 1 2 table potentials/W_He_JW2013.table WHe
+
+# Ackland-Thetford (possibly incorrect)
+# https://openkim.org/id/EAM_Dynamo_Ackland_2003_W__MO_141627196590_005#files
+pair_coeff * * eam/fs potentials/W.eam.fs W NULL
+
+# Beck (1968)
+# https://www.tandfonline.com/doi/epdf/10.1080/00268976800100381?needAccess=true
+# pair_coeff * * A B a alpha beta
+pair_coeff 2 2 beck 398.7 0.869 0.675 4.390 3.746E-6
+
+
+
+# 4) Visualization
+# dump dmp all atom 50 dump_run${i}.lammpstrj
+# thermo 10
+
+
+
+# 5) Run
+# fixes (Langevin thermostat)
+# reset_atoms id sort yes
+velocity W_atoms create ${T} 425521 mom yes rot yes dist gaussian
+# fix mynvt all nvt temp ${T} ${T} 5e-10\
+fix mynve all nve
+fix mylang bottom_4a langevin ${T} ${T} ${damping} 4444 zero yes
+
+# velocity calculations referencing
+# https://www.ericnhahn.com/tutorials/lammps-tutorials/pka
+variable eV equal 60
+variable J equal ${eV}*1.602*10^-19
+variable mass_amu equal 4.0026 
+variable mass_kg equal ${mass_amu}*1.66*10^-27
+variable velocity_ms equal (2*${J}/${mass_kg})^0.5
+variable velocity equal -1*${velocity_ms}/100 # now in angstrom/picosecond
+# print ${velocity} #-5.37894048846143e+21 angstroms/ps
+
+# create the bombarding Helium atom and print z-position to file
+# random (x,y) position within x=[5,15] and y=[5,15], units lattice
+create_atoms 2 single ${startX} ${startY} 21 units lattice
+set type 2 charge 1.0
+group H_bomb type 2
+velocity H_bomb set 0 0 ${velocity} units box
+
+# record velocity and surface position data in a file
+variable posZ equal xcm(H_bomb,z)
+variable velZ equal vcm(H_bomb,z)
+variable surfaceZ equal bound(W_atoms,zmax)
+# fix writeZ all print 50 "${posZ} ${velZ} ${surfaceZ}" file He_run${i}.txt screen no
+
+# run until velocity of helium atom is greater than 300 (reflection)
+# fix halt_absorb all halt 10 v_posZ > 100
+
+# min_style cg
+# minimize 0 0 10000 10000
+
+timestep ${dt}
+run ${runtime}
+
+print "${i} ${seedX} ${seedY} ${posZ} ${surfaceZ}" append data-1k-chunk-${chunk}.txt screen no
+
+next i
+jump SELF loop
+############ End Loop ############

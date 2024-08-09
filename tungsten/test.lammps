@@ -1,0 +1,7 @@
+variable number equal random(5,15,888)
+print ${number}
+print ${number}
+print ${number}
+print ${number}
+print ${number}
+print ${number}

@@ -1,0 +1,14 @@
+# This LAMMPS input file continuously inserts Helium atoms
+# into the middle of a forsterite block :O
+
+
+# velocity calculations from
+# https://www.ericnhahn.com/tutorials/lammps-tutorials/pka
+variable eV equal 60
+variable J equal ${eV}*1.602*10^-19
+variable mass_amu equal 4.0026 
+variable mass_kg equal ${mass_amu}*1.66*10^-27
+variable velocity_ms equal (2*${J}/${mass_kg})^0.5
+variable velocity equal -1*${velocity_ms}/100 # now in angstrom/picosecond
+
+print ${velocity}

@@ -1,0 +1,67 @@
+# This LAMMPS input file continuously inserts Helium atoms
+# into the middle of a forsterite block :O
+
+variable T equal 273
+variable seed equal 12345
+variable dt equal 0.0005
+variable damping equal 10*${dt}
+variable run string try28
+
+
+
+# 1) Initialization
+units metal
+dimension 3
+boundary p p p
+atom_style charge # atomic + q
+
+
+
+# 2) System definition
+read_data ../atoms/cube/forsterite_bombed_try8.data
+
+change_box all z final 0 86
+
+group forsterite_atoms type 1 2 3
+group He_bombs type 4
+region fixed_layer block INF INF INF INF INF 10
+region thermo_layer block INF INF INF INF 10 35
+group fixed_atoms region fixed_layer 
+group unfixed_atoms subtract all fixed_atoms He_bombs # prevent double time integration
+group thermo_atoms region thermo_layer
+
+
+
+# 3) Simulation settings
+mass 1 24.305   # Mg
+mass 2 28.0855  # Si
+mass 3 15.9994  # O
+mass 4 4.0026   # He
+# set type 4 charge 1.0
+
+# potentials
+variable num index 1
+include ../new-potentials-indexed/${num}.param
+
+
+# 4) Visualization
+dump dmp all atom 1000 dump${num}.lammpstrj
+
+
+
+# 5) Run
+fix my_nve unfixed_atoms nve
+fix he_nve He_bombs nve
+fix mylang thermo_atoms langevin ${T} ${T} ${damping} ${seed} zero yes
+# fix mydeposit He_bombs deposit ${n} 4 ${m} ${seed} region spawn_He near 0.2 vx 0 0 vy 0 0 vz 0 0
+
+
+compute msd He_bombs msd
+variable numHe equal count(He_bombs)
+thermo_style custom step time atoms temp press v_numHe c_msd[1] c_msd[2] c_msd[3] c_msd[4]
+thermo_modify lost warn # ignore lost atoms
+thermo 100
+
+
+timestep ${dt}
+run 500000

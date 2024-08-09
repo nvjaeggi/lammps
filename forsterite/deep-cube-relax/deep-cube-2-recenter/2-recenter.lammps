@@ -1,0 +1,23 @@
+# This LAMMPS input file shifts the lattice/atoms so that the 
+# simulation box has its xlo ylo zlo at the origin again.
+# The previous fix box/relax changes the simulation box. 
+
+variable run_name string deep-cube
+
+# 1) Initialization
+units metal
+dimension 3
+boundary p p p
+atom_style charge # atomic + q
+
+
+# 2) System definition
+read_data atoms/${run_name}/forsterite_relaxed.data # includes mass and charge atomic data
+
+variable new_xhi equal xhi-xlo
+variable new_yhi equal yhi-ylo
+variable new_zhi equal zhi-zlo
+
+change_box all x final 0 ${new_xhi} y final 0 ${new_yhi} z final 0 ${new_zhi} remap
+
+write_data atoms/${run_name}/forsterite_relaxed_recentered.data

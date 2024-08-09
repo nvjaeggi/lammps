@@ -1,0 +1,48 @@
+variable T equal 273
+variable seed equal 12345
+variable dt equal 0.00001
+variable damping equal 5*${dt}
+
+units metal
+dimension 3
+boundary p p f
+atom_style charge # atomic + q
+
+read_data atoms/cube/forsterite_bombed2.data
+
+region fixed_layer block INF INF INF INF INF 10
+region thermo_layer block INF INF INF INF 10 35
+group fixed_atoms region fixed_layer
+group unfixed_atoms subtract all fixed_atoms
+group thermo_atoms region thermo_layer
+group forsterite_atoms type 1 2 3
+group He_bombs type 4
+
+mass 1 24.305   # Mg
+mass 2 28.0855  # Si
+mass 3 15.9994  # O
+mass 4 4.0026   # He
+set type 4 charge 1.0
+
+include potentials/pedone.param
+
+# potential and kinetic energy per atom
+compute pot all pe/atom
+compute ket all ke/atom
+dump dmp2 all custom 10 cube-atomic-pot-energy.txt id type c_pot c_ket
+
+# stress / pressure and voronoi volume
+compute stress He_bombs stress/atom NULL
+compute voronoi He_bombs voronoi/atom
+dump dmp3 He_bombs custom 10 cube-atomic-stress-volume.txt id type c_voronoi[1] c_stress[1] c_stress[2] c_stress[3]
+
+
+
+# fixes (Langevin thermostat)
+fix mynve unfixed_atoms nve
+fix nveHe He_bombs nve
+# fix myfreeze fixed_atoms setforce 0.0 0.0 0.0
+fix mylang thermo_atoms langevin ${T} ${T} ${damping} ${seed} zero yes
+
+timestep ${dt}
+run 10
