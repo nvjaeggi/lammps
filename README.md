@@ -5,15 +5,35 @@ The following LAMMPS input files and Python codes are for the purpose of simulat
 ![yay](./images/meme.png)
 ## Installation
 
-The instructions for installing LAMMPS are [here](https://docs.lammps.org/Install.html). The Pedone potential was added in the 17Apr2024 version of LAMMPS so you may have to download the source code and build it yourself (or maybe by the time you are reading this there is an executable version of 17Apr2024 available). I used CMake to build. 
+The instructions for installing LAMMPS are [here](https://docs.lammps.org/Install.html). The Pedone potential was added in the 17Apr2024 version of LAMMPS so you may have to download the source code and build it yourself (or maybe by the time you are reading this there is an executable version of 17Apr2024 available). It is recommended to use CMake to build following the [instructions](https://docs.lammps.org/Build_cmake.html) 
 
-If you encounter a missing package error and you have built LAMMPS using CMake, go to CMakeCache.txt in the /build folder of LAMMPS and set the package to ON. Then, rebuild by running the following in the /build folder. 
+To build the whole of lammps (all packages), run 
 
 ```
-cmake --build .
+cd lammps                # change to the LAMMPS distribution directory
+mkdir build; cd build    # create and use a build directory
+```
+We created a preset with the packages used in the vesicle simulations which includes the packages `EXTRA-DUMP EXTRA-PAIR KSPACE MANYBODY MOLECULE REAXFF RIGID VORONOI 
+ `
+This may take 30-45 minutes:
+```
+cmake -C ../cmake/presets/vesicles_on.cmake ../cmake    
+cmake --build .          
+```
+
+Then, install the LAMMPS executable into your system with
+
+```
 make install
-``` 
-The packages that I have are EXTRA-DUMP, EXTRA-PAIR, MANYBODY, MOLECULE, REAXFF, RIGID, and VORONOI. 
+```
+
+> [!NOTE]
+> If you encounter a missing package error and you have built LAMMPS using CMake, go to CMakeCache.txt in the /build folder of LAMMPS and set the package to ON. Then, rebuild by running the following in the /build folder.
+> ```
+> cmake --build .
+> make install
+> ```
+
 
 ## Run
 
